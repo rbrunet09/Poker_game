@@ -1,5 +1,6 @@
 package com.renaud.poker_game.service;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -7,7 +8,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.http.HttpStatus;
 
 import com.renaud.poker_game.model.Card;
 import com.renaud.poker_game.model.Deck;
@@ -26,92 +30,119 @@ public class GameServiceImpl implements GameService {
 	}
 
 	@Override
-	public String createGame() 
+	public ResponseEntity<Game> createGame() 
 	{
 		Game game = new Game();
-		Game gameState = gameRepository.save( game );
-		return gameState + " was created.";
+		
+		Game savedGame = gameRepository.save( game );
+		
+		return new ResponseEntity<Game>(savedGame, HttpStatus.CREATED);
 	}
 
 	@Override
-	public String deleteGame(Long gameId) {
+	public ResponseEntity<String> deleteGame(Long gameId) {
+		
 		gameRepository.deleteById( gameId );
-		return "Game " + gameId + " was deleted.";
+		
+		return new ResponseEntity<String>(HttpStatus.OK);
 	}
-
+	
 	@Override
-	public String addPlayer(Long gameId, Player player) {
+	public @ResponseBody ResponseEntity<?> getGame(Long gameId) {
 		
 		Optional<Game> optionalGame = gameRepository.findById(gameId);
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist with id " + gameId;
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
+		
+		Game game = optionalGame.get();
+		
+		return new ResponseEntity<Game>(game, HttpStatus.OK);
+	}
+
+	@Override
+	public @ResponseBody ResponseEntity<?> addPlayer(Long gameId, Player player) {
+		
+		Optional<Game> optionalGame = gameRepository.findById(gameId);
+		if(optionalGame.isEmpty())
+			return ResponseEntity.status( HttpStatus.NOT_FOUND ).body( "The game was not found." );
 		
 		Game game = optionalGame.get();
 		List<Player> playerList = game.getPlayersList();
 		playerList.add(player);
 		game.setPlayersList(playerList);
 		
-		Game gameState = gameRepository.save(game);
+		Game savedGame = gameRepository.save(game);
 		
-		return gameState.toString();
+		return new ResponseEntity<Game>( savedGame, HttpStatus.OK );
 	}
 	
 	@Override
-	public String deletePlayer( Long gameId, Long playerId )
+	public @ResponseBody ResponseEntity<?> deletePlayer( Long gameId, Long playerId )
 	{
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		List<Player> playerList = game.getPlayersList();
 		playerList.removeIf( player -> player.getId() == playerId );
 		game.setPlayersList(playerList);
 		
-		Game gameState = gameRepository.save(game);
+		Game savedGame = gameRepository.save(game);
 		
-		return gameState.toString();
+		return new ResponseEntity<Game>( savedGame, HttpStatus.OK );
+	}
+	
+	@Override
+	public @ResponseBody ResponseEntity<?> getPlayer(Long gameId, Long playerId) {
+
+		Optional<Game> optionalGame = gameRepository.findById( gameId );
+		if(optionalGame.isEmpty())
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
+		
+		Game game = optionalGame.get();
+		List<Player> playerList = game.getPlayersList();
+		
+		Optional<Player> optionalPlayer = playerList.stream().filter( player -> player.getId() == playerId ).findFirst();
+		
+		if(optionalPlayer.isEmpty())
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The player was not found.");
+
+		
+		return new ResponseEntity<Player>( optionalPlayer.get(), HttpStatus.OK );
+		
 	}
 
 	@Override
-	public String createDeck(Long gameId) {
+	public @ResponseBody ResponseEntity<?> createDeck(Long gameId) {
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		if( game.getDeck() != null && !game.getDeck().getCardsStack().isEmpty() )
 		{
-			return "Game " + gameId + " deck is not empty. You can only add deck.";
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body( "The game deck is not empty, you can only add a deck.");
 		}
 		
 		Deck deck = new Deck();
 		game.setDeck(deck);
 		
-		Game gameState = gameRepository.save(game);
+		Game savedGame = gameRepository.save(game);
 		
-		return gameState.toString();
+		return new ResponseEntity<Game>( savedGame, HttpStatus.OK );
 	}
 
 	@Override
-	public String addDeck(Long gameId) {
+	public @ResponseBody ResponseEntity<?> addDeck(Long gameId) {
 		
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		Deck gameDeck = game.getDeck();
-		if( gameDeck == null )
-		{
-			Deck deck = new Deck();
-			game.setDeck(deck);
-			
-			gameRepository.save(game);
-			
-			return "The game had no deck so a deck was created for game " + gameId;
-		}
-		
+
 		Deck newDeck = new Deck();
 		
 		List<Card> newStack = newDeck.getCardsStack();
@@ -120,17 +151,17 @@ public class GameServiceImpl implements GameService {
 		gameDeck.setCardsStack( newStack );
 		game.setDeck(gameDeck);
 		
-		gameRepository.save(game);
+		Game savedGame = gameRepository.save(game);
 		
-		return "A deck was added to game " + gameId + " the deck has now " + newStack.size() + " cards.";
+		return new ResponseEntity<Game>( savedGame, HttpStatus.OK );
 	}
 
 	@Override
-	public String dealCard(Long gameId, Integer numberOfCard) {
+	public @ResponseBody ResponseEntity<?> dealCard(Long gameId, Integer numberOfCard) {
 		
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		Deck deck = game.getDeck();
@@ -158,17 +189,17 @@ public class GameServiceImpl implements GameService {
 		game.setDeck(deck);
 		game.setPlayersList( playerList );
 		
-		Game gameState = gameRepository.save( game );
+		Game savedGame = gameRepository.save( game );
 		
-		return numberOfCard + " cards where dealt to each player in " + gameState;
+		return new ResponseEntity<Game>( savedGame, HttpStatus.OK );
 	}
 
 	@Override
-	public String getPlayersListWithScore(Long gameId) {
+	public ResponseEntity<?> getPlayersListWithScore(Long gameId) {
 		
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		List<Player> playerList = game.getPlayersList();
@@ -176,7 +207,7 @@ public class GameServiceImpl implements GameService {
 		Collections.sort( playerList );
 		Collections.reverse( playerList );
 		
-		String response = " ";
+		List < AbstractMap.SimpleEntry<String, Integer> > playersScordList = new ArrayList< AbstractMap.SimpleEntry<String, Integer> >(); 
 		
 		for ( Player player : playerList )
 		{
@@ -187,18 +218,20 @@ public class GameServiceImpl implements GameService {
 				score += card.getValue().ordinal();
 			}
 			
-			response += player.getUsername() + " score is " + score + " ";
+			AbstractMap.SimpleEntry<String, Integer> playerScore = new AbstractMap.SimpleEntry<String, Integer>( player.getUsername(), score );
+			
+			playersScordList.add(playerScore);
 		}
 				
-		return response;
+		return new ResponseEntity< List < AbstractMap.SimpleEntry<String, Integer> > >( playersScordList, HttpStatus.OK );
 	}
 
 	@Override
-	public String getCardsListForPlayer(Long gameId, Long playerId) {
+	public @ResponseBody ResponseEntity<?> getCardsListForPlayer(Long gameId, Long playerId) {
 		
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		List<Player> playerList = game.getPlayersList();
@@ -206,21 +239,21 @@ public class GameServiceImpl implements GameService {
 		Optional<Player> optionalPlayer = playerList.stream().filter(player -> player.getId() == playerId).findFirst();
 		
 		if( optionalPlayer.isEmpty() )
-			return "Player " + playerId + " doesn't exist in game " + gameId;
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The player was not found in the game.");
 		
 		Player player = optionalPlayer.get();
 		List<Card> hand = player.getHand();
 		
 		
-		return hand.toString();
+		return new ResponseEntity< List<Card> >( hand , HttpStatus.OK );
 	}
 
 	@Override
-	public String getCardsLeftPerSuit(Long gameId) {
+	public @ResponseBody ResponseEntity<?> getCardsLeftPerSuit(Long gameId) {
 		
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		List<Card> cardStack = game.getDeck().getCardsStack();
@@ -238,20 +271,20 @@ public class GameServiceImpl implements GameService {
 			numberOfcardPerSuit.replace( card.getSuit().name(), (count + 1) );
 		}
 		
-		return numberOfcardPerSuit.toString();
+		return new ResponseEntity< HashMap<String, Integer> >( numberOfcardPerSuit , HttpStatus.OK );
 	}
 
 	@Override
-	public String getCardsLeftSorted(Long gameId) {
+	public @ResponseBody ResponseEntity<?> getCardsLeftSorted(Long gameId) {
 		
 		Optional<Game> optionalGame = gameRepository.findById( gameId );
 		if(optionalGame.isEmpty())
-			return "Game doesn't exist";
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("The game was not found.");
 		
 		Game game = optionalGame.get();
 		List<Card> cardStack = game.getDeck().getCardsStack();
 		
-		HashMap<Card, Integer> numberOfcardPerSuit = new HashMap<Card, Integer>(); 
+		HashMap<Card, Integer> numberOfcardLeft = new HashMap<Card, Integer>(); 
 		
 
 		for (Card.Suit suit : Card.Suit.values()) 
@@ -261,17 +294,17 @@ public class GameServiceImpl implements GameService {
 				if(number == Card.Value.DUMMY)
 					continue;
 				Card card = new Card( suit, number);
-				numberOfcardPerSuit.put(card, 0);
+				numberOfcardLeft.put(card, 0);
 		    }
 		}
 
 		for(Card card: cardStack)
 		{
-			Integer count = numberOfcardPerSuit.get( card );
-			numberOfcardPerSuit.replace( card, (count + 1) );
+			Integer count = numberOfcardLeft.get( card );
+			numberOfcardLeft.replace( card, (count + 1) );
 		}
 		
-		return numberOfcardPerSuit.toString();
+		return new ResponseEntity< HashMap<Card, Integer> >( numberOfcardLeft , HttpStatus.OK );
 	}
 
 	@Override
