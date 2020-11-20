@@ -47,7 +47,7 @@ public class GameController {
 		return gameService.addPlayer( gameId, player );
 	}
 	
-	@DeleteMapping( "/games/{gameId}/players/{playerId}/delete/" )
+	@DeleteMapping( "/games/{gameId}/players/{playerId}/delete" )
 	public ResponseEntity<?> deletePlayer( @PathVariable Long gameId,  @PathVariable Long playerId ) 
 	{
 		return gameService.deletePlayer( gameId, playerId );
